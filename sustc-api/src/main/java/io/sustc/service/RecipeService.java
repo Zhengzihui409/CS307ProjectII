@@ -121,7 +121,6 @@ public interface RecipeService {
      *
      * @throws SecurityException if {@code auth} is invalid, inactive,
      *         or if the operator is not the recipe author
-     * @throws IllegalArgumentException if {@code recipeId <= 0}
      */
     void deleteRecipe(long recipeId, AuthInfo auth);
 
