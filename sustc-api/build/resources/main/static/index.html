@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"/>
+    <title>Recipe Search</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        input, button { padding: 6px; }
+        .card { border: 1px solid #ddd; padding: 10px; margin: 8px 0; }
+        .small { color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+<h2>Recipe Search</h2>
+<input id="kw" placeholder="keyword"/>
+<button onclick="search()">Search</button>
+<div id="list"></div>
+<div id="detail"></div>
+
+<script>
+    async function search() {
+        const kw = document.getElementById('kw').value;
+        const res = await fetch(`/api/recipes/search?keyword=${encodeURIComponent(kw)}&page=1&size=5`);
+        const data = await res.json();
+        const list = document.getElementById('list');
+        list.innerHTML = '';
+        (data.items || []).forEach(r => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `
+      <b>${r.name}</b> (id=${r.recipeId})<br/>
+      rating: ${r.aggregatedRating ?? '-'} | reviews: ${r.reviewCount ?? 0} <br/>
+      <span class="small">${r.description || ''}</span><br/>
+      <button onclick="detail(${r.recipeId})">View</button>
+    `;
+            list.appendChild(div);
+        });
+    }
+
+    async function detail(id) {
+        const res = await fetch(`/api/recipes/${id}`);
+        const r = await res.json();
+        const d = document.getElementById('detail');
+        d.innerHTML = `
+    <h3>${r.name} (id=${r.recipeId})</h3>
+    <div>Author: ${r.authorName} (#${r.authorId})</div>
+    <div>Category: ${r.recipeCategory || '-'}</div>
+    <div>Rating: ${r.aggregatedRating ?? '-'} | Reviews: ${r.reviewCount ?? 0}</div>
+    <div>Calories: ${r.calories ?? '-'}</div>
+    <div>Ingredients: ${(r.recipeIngredientParts || []).join(', ')}</div>
+    <p>${r.description || ''}</p>
+  `;
+    }
+</script>
+</body>
+</html>8

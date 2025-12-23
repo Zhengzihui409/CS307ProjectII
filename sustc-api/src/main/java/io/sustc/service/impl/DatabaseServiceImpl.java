@@ -13,13 +13,11 @@ import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import java.io.IOException;
+import java.sql.*;
 import java.util.*;
 import javax.sql.DataSource;
-import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -30,7 +28,6 @@ import java.util.List;
 @Service
 @Slf4j
 public class DatabaseServiceImpl implements DatabaseService {
-
     /**
      * Getting a {@link DataSource} instance from the framework, whose connections are managed by HikariCP.
      * <p>
@@ -44,7 +41,7 @@ public class DatabaseServiceImpl implements DatabaseService {
     @Override
     public List<Integer> getGroupMembers() {
         //TODO: replace this with your own student IDs in your group
-        return Arrays.asList(12210000, 12210001, 12210002);
+        return Arrays.asList(12412733,12312312);
     }
 
     @Autowired
@@ -55,13 +52,148 @@ public class DatabaseServiceImpl implements DatabaseService {
     public void importData(
             List<ReviewRecord> reviewRecords,
             List<UserRecord> userRecords,
-            List<RecipeRecord> recipeRecords) {
-
+            List<RecipeRecord> recipeRecords)  {
         // ddl to create tables.
         createTables();
-
         // TODO: implement your import logic
+        String insertUserSQL = "INSERT INTO users (AuthorId, AuthorName, Gender, Age, Followers, Following, Password, IsDeleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        jdbcTemplate.batchUpdate(insertUserSQL, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                UserRecord userRecord = userRecords.get(i);
+                ps.setLong(1, userRecord.getAuthorId());
+                ps.setString(2, userRecord.getAuthorName());
+                ps.setString(3, userRecord.getGender());
+                ps.setInt(4, userRecord.getAge());
+                ps.setInt(5, userRecord.getFollowers());
+                ps.setInt(6, userRecord.getFollowing());
+                ps.setString(7, userRecord.getPassword());
+                ps.setBoolean(8, userRecord.isDeleted());
+            }
+            @Override
+            public int getBatchSize() {
+                return userRecords.size();
+            }
+        });
+        String insertRecipeSQL = "INSERT INTO recipes (RecipeId, Name, AuthorId, CookTime, PrepTime, TotalTime, DatePublished, Description, RecipeCategory, AggregatedRating, ReviewCount, Calories, FatContent, SaturatedFatContent, CholesterolContent, SodiumContent, CarbohydrateContent, FiberContent, SugarContent, ProteinContent, RecipeServings, RecipeYield) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        jdbcTemplate.batchUpdate(insertRecipeSQL, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                RecipeRecord recipeRecord = recipeRecords.get(i);
+                ps.setLong(1, recipeRecord.getRecipeId());
+                ps.setString(2, recipeRecord.getName());
+                ps.setLong(3, recipeRecord.getAuthorId());
+                ps.setString(4, recipeRecord.getCookTime());
+                ps.setString(5, recipeRecord.getPrepTime());
+                ps.setString(6, recipeRecord.getTotalTime());
+                ps.setTimestamp(7, recipeRecord.getDatePublished());
+                ps.setString(8, recipeRecord.getDescription());
+                ps.setString(9, recipeRecord.getRecipeCategory());
+                ps.setObject(10, recipeRecord.getAggregatedRating());
+                ps.setInt(11, recipeRecord.getReviewCount());
+                ps.setObject(12, recipeRecord.getCalories());
+                ps.setObject(13, recipeRecord.getFatContent());
+                ps.setObject(14, recipeRecord.getSaturatedFatContent());
+                ps.setObject(15, recipeRecord.getCholesterolContent());
+                ps.setObject(16, recipeRecord.getSodiumContent());
+                ps.setObject(17, recipeRecord.getCarbohydrateContent());
+                ps.setObject(18, recipeRecord.getFiberContent());
+                ps.setObject(19, recipeRecord.getSugarContent());
+                ps.setObject(20, recipeRecord.getProteinContent());
+                ps.setInt(21, recipeRecord.getRecipeServings());
+                ps.setString(22, recipeRecord.getRecipeYield());
+            }
+            @Override
+            public int getBatchSize() {
+                return recipeRecords.size();
+            }
+        });
+        String insertReviewSQL = "INSERT INTO reviews (ReviewId, RecipeId, AuthorId, Rating, Review, DateSubmitted, DateModified) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        jdbcTemplate.batchUpdate(insertReviewSQL, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                ReviewRecord reviewRecord = reviewRecords.get(i);
+                ps.setLong(1, reviewRecord.getReviewId());
+                ps.setLong(2, reviewRecord.getRecipeId());
+                ps.setLong(3, reviewRecord.getAuthorId());
+                ps.setObject(4, reviewRecord.getRating());
+                ps.setString(5, reviewRecord.getReview());
+                ps.setTimestamp(6, reviewRecord.getDateSubmitted());
+                ps.setTimestamp(7, reviewRecord.getDateModified());
+            }
+            @Override
+            public int getBatchSize() {
+                return reviewRecords.size();
+            }
+        });
 
+        List<long[]> followerPairs = new ArrayList<>();
+        for (UserRecord userRecord : userRecords) {
+            long authorId = userRecord.getAuthorId();
+            for (long followerId : userRecord.getFollowerUsers()) {
+                followerPairs.add(new long[]{followerId, authorId});
+            }
+        }
+        String insertUserFollowerSQL = "INSERT INTO user_follows (FollowerId, FollowingId) VALUES (?, ?)";
+        jdbcTemplate.batchUpdate(insertUserFollowerSQL, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                long[] pair = followerPairs.get(i);
+                ps.setLong(1, pair[0]);
+                ps.setLong(2, pair[1]);
+            }
+
+            @Override
+            public int getBatchSize() {
+                return followerPairs.size();
+            }
+        });
+        List<Object[]> ingredientPairs = new ArrayList<>();
+        for (RecipeRecord recipeRecord : recipeRecords) {
+            long recipeId = recipeRecord.getRecipeId();
+            String[] ingredients = recipeRecord.getRecipeIngredientParts();
+            Set<String> uniqueIngredients = new HashSet<>();
+            for (String ingredient : ingredients) {
+                uniqueIngredients.add(ingredient);
+            }
+            for (String uniqueIngredient : uniqueIngredients) {
+                ingredientPairs.add(new Object[]{recipeId, uniqueIngredient});
+            }
+        }
+        String recipe_ingredientsSQL = "INSERT INTO recipe_ingredients (RecipeId, IngredientPart) VALUES (?, ?)";
+        jdbcTemplate.batchUpdate(recipe_ingredientsSQL, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                Object[] pair = ingredientPairs.get(i);
+                ps.setLong(1, (Long) pair[0]);
+                ps.setString(2, (String) pair[1]);
+            }
+            @Override
+            public int getBatchSize() {
+                return ingredientPairs.size();
+            }
+        });
+        String review_likesSQL="INSERT INTO review_likes (ReviewId, AuthorId) VALUES (?, ?)";
+        List<Object[]> likespairs=new ArrayList<>();
+        for(ReviewRecord reviewRecord:reviewRecords){
+            long reviewId=reviewRecord.getReviewId();
+            long[] authorIds=reviewRecord.getLikes();
+            for(long Id:authorIds){
+                likespairs.add(new Object[]{reviewId,Id});
+            }
+        }
+        jdbcTemplate.batchUpdate(review_likesSQL, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                Object[] pair = likespairs.get(i);
+                ps.setLong(1, (Long) pair[0]);
+                ps.setLong(2, (Long) pair[1]);
+            }
+            @Override
+            public int getBatchSize() {
+                return likespairs.size();
+            }
+        });
     }
 
 

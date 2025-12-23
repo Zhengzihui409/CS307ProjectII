@@ -17,6 +17,10 @@ dependencies {
 
     implementation("org.furyio:fury-core:0.3.1")
 
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0")
+
+    implementation("org.springframework.boot:spring-boot-starter-web")
+
     // You may add any utility library you want to use, such as guava.
     // ORM libraries are prohibited in this project.
 }
